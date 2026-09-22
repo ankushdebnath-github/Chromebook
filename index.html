@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chromebook Desk</title>
+  <script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root { --ink:#17232b; --muted:#68747b; --paper:#f7f6f1; --panel:#fffefa; --line:#dfe3df; --teal:#0c7774; --teal-dark:#075351; --coral:#d7604c; --green:#2c815a; --red:#a33d2e; --shadow:0 12px 30px rgba(23,35,43,.08); }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--paper); font:15px/1.45 "Trebuchet MS", Verdana, sans-serif; }
+    header { background:var(--ink); color:#fffefa; padding:30px max(24px,calc((100% - 1280px)/2)); display:flex; justify-content:space-between; gap:25px; align-items:end; }
+    header h1 { margin:0; font:700 34px/1.05 Georgia, serif; letter-spacing:.2px; } header p { margin:8px 0 0; color:#c7d2d0; }
+    .header-mark { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:#8ed5c2; white-space:nowrap; }
+    main { max-width:1280px; margin:0 auto; padding:28px 24px 60px; } .stats { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:24px; }
+    .stat, .panel { background:var(--panel); border:1px solid var(--line); box-shadow:var(--shadow); } .stat { padding:18px 20px; border-top:4px solid var(--teal); } .stat span { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; } .stat strong { display:block; margin-top:7px; font:700 29px Georgia,serif; }
+    .stat.broken { border-top-color:var(--red); } .stat.broken strong { color:var(--red); }
+    .layout { display:grid; grid-template-columns:380px 1fr; gap:22px; align-items:start; } .panel { padding:22px; } h2 { margin:0 0 18px; font:700 22px Georgia,serif; } h3 { margin:0 0 12px; font-size:16px; }
+    label { display:block; margin:13px 0 6px; color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; } input, select, textarea { width:100%; border:1px solid #cbd3d0; background:#fff; color:var(--ink); padding:11px 12px; border-radius:4px; font:inherit; } input:focus, select:focus, textarea:focus { outline:2px solid #8ed5c2; border-color:var(--teal); }
+    textarea { resize:vertical; min-height:70px; } button { border:0; border-radius:4px; padding:11px 15px; font:700 14px inherit; cursor:pointer; } button.primary { background:var(--teal); color:#fff; } button.primary:hover { background:var(--teal-dark); } button.secondary { background:#e9efeb; color:var(--teal-dark); } button.danger { color:var(--red); background:#fbe9e5; } .actions { display:flex; gap:9px; margin-top:18px; } .actions button { flex:1; }
+    .hint { background:#edf6f1; border-left:3px solid var(--teal); padding:10px 12px; color:#42635c; font-size:13px; margin-bottom:15px; } .hidden { display:none !important; }
+    .toolbar { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:15px; flex-wrap:wrap; } .toolbar input { max-width:250px; flex:1; min-width:200px; } .toolbar button { white-space:nowrap; }
+    .search-filters { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px; }
+    .search-filters select { max-width:150px; flex:1; min-width:120px; }
+    .table-wrap { overflow:auto; } table { width:100%; border-collapse:collapse; min-width:800px; } th { text-align:left; color:var(--muted); font-size:11px; letter-spacing:.7px; text-transform:uppercase; border-bottom:2px solid var(--line); padding:10px 8px; } td { border-bottom:1px solid var(--line); padding:12px 8px; vertical-align:top; } tr:last-child td { border-bottom:0; } .serial { font-weight:700; letter-spacing:.5px; } .model { color:var(--muted); font-size:12px; } .badge { display:inline-block; padding:4px 8px; border-radius:20px; font-size:11px; font-weight:700; } .available { color:var(--green); background:#e2f3e8; } .issued { color:#a3442f; background:#fbe9e5; } .broken { color:var(--red); background:#fce4e0; }
+    .empty { text-align:center; padding:30px 10px; color:var(--muted); } .footnote { margin-top:15px; color:var(--muted); font-size:12px; } .toast { position:fixed; right:22px; bottom:22px; background:var(--ink); color:#fff; padding:13px 17px; border-radius:4px; box-shadow:var(--shadow); }
+    .modal { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); z-index:1000; justify-content:center; align-items:center; }
+    .modal.active { display:flex; } .modal-content { background:var(--panel); border-radius:8px; padding:28px; max-width:450px; width:90%; box-shadow:var(--shadow); } .modal-content h3 { margin-top:0; } .modal-actions { display:flex; gap:9px; margin-top:18px; } .modal-actions button { flex:1; }
+    .sync-status { display:inline-block; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; background:#e8f4f1; color:#0c7774; margin-bottom:15px; }
+    .app-nav { background:#fffefa; border-bottom:1px solid var(--line); padding:0 max(24px,calc((100% - 1280px)/2)); display:flex; gap:4px; overflow:auto; }
+    .nav-link { border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent; color:var(--muted); padding:15px 16px 12px; white-space:nowrap; }
+    .nav-link:hover, .nav-link.active { color:var(--teal-dark); background:#edf6f1; border-bottom-color:var(--teal); }
+    .page { display:none; animation:rise .25s ease both; } .page.active { display:block; }
+    .welcome.page.active { display:flex; } .stats.page.active { display:grid; }
+    .welcome { justify-content:space-between; align-items:end; gap:24px; padding:22px 0 26px; }
+    .welcome h2 { font-size:32px; margin-bottom:7px; } .welcome p { color:var(--muted); margin:0; max-width:560px; }
+    .quick-actions { display:flex; gap:9px; flex-wrap:wrap; } .quick-actions button { background:var(--ink); color:#fff; }
+    #inventoryPanel.page.active { grid-column:1 / -1; }
+    .section-kicker { color:var(--teal); font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; margin-bottom:7px; }
+    @keyframes rise { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+    @media (max-width:1000px) { header { display:block; } .header-mark { margin-top:18px; } .stats.page.active { grid-template-columns:repeat(2,1fr); } .layout { grid-template-columns:1fr; } .toolbar, .search-filters { align-items:stretch; flex-direction:column; } .toolbar input, .search-filters select { max-width:none; } }
+    @media (max-width:560px) { main { padding:20px 16px 45px; } header { padding:24px 16px; } header h1 { font-size:29px; } .stats.page.active { grid-template-columns:1fr; } .welcome.page.active { display:block; } .quick-actions { margin-top:18px; } .nav-link { padding-left:11px; padding-right:11px; } }
+  </style>
+</head>
+<body>
+  <header><div><h1>Chromebook Desk</h1><p>Universal device tracking - synced to cloud.</p></div><div class="header-mark">Device lending register</div></header>
+  <nav class="app-nav" aria-label="Main navigation">
+    <button class="nav-link active" data-page="home">⌂ Home</button>
+    <button class="nav-link" data-page="handovers">↗ Handovers</button>
+    <button class="nav-link" data-page="schedule">◷ Collection schedule</button>
+    <button class="nav-link" data-page="damage">⚠ Damage</button>
+    <button class="nav-link" data-page="logs">▤ Handover logs</button>
+  </nav>
+  <main>
+    <div class="sync-status" id="syncStatus">🔄 Syncing with cloud...</div>
+    <section class="welcome page active" data-page="home">
+      <div><div class="section-kicker">Operations overview</div><h2>Know where every Chromebook is.</h2><p>Track handovers, upcoming collections, and repairs from one calm workspace.</p></div>
+      <div class="quick-actions"><button data-go="handovers">Issue a Chromebook</button><button data-go="damage">Report damage</button></div>
+    </section>
+    <section class="stats page active" data-page="home" aria-label="Summary">
+      <div class="stat"><span>Total devices</span><strong id="total">17</strong></div>
+      <div class="stat"><span>Available</span><strong id="available">17</strong></div>
+      <div class="stat"><span>Currently issued</span><strong id="issued">0</strong></div>
+      <div class="stat broken"><span>Broken/Damaged</span><strong id="broken">0</strong></div>
+      <div class="stat"><span>Total handovers</span><strong id="logs">0</strong></div>
+    </section>
+    <div class="layout">
+      <section class="panel page" data-page="handovers" id="handoverPanel">
+        <h2>Record a handover</h2>
+        <div class="hint">Choose a serial number to issue a Chromebook.</div>
+        <form id="issueForm">
+          <label for="device">Chromebook</label>
+          <select id="device" required></select>
+          <label for="borrower">Issued to</label>
+          <input id="borrower" required placeholder="Student or staff name">
+          <label for="issueDate">Date issued</label>
+          <input id="issueDate" type="date" required>
+          <label for="collectionDate">Collection date</label>
+          <input id="collectionDate" type="date" required>
+          <div class="actions">
+            <button class="primary" type="submit">Issue Chromebook</button>
+            <button class="secondary" type="reset">Clear</button>
+          </div>
+        </form>
+        <p class="footnote">☁️ Data synced to cloud. Access from any device.</p>
+      </section>
+
+      <section class="panel page active" data-page="home" id="inventoryPanel">
+        <div class="toolbar">
+          <h2>Inventory</h2>
+          <div style="display:flex;gap:9px;width:100%">
+            <input id="search" placeholder="Search serial or name" style="flex:1">
+            <button id="export" class="secondary" type="button">Export CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Serial</th><th>Model</th><th>Status</th><th>Issued to</th><th>Date issued</th><th>Collection date</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="inventory"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel page" data-page="logs" style="margin-top:22px">
+      <div class="toolbar">
+        <h2>Handover Log</h2>
+        <input id="logSearch" placeholder="Search the log" style="flex:1">
+      </div>
+      <div class="search-filters">
+        <select id="dateFilter">
+          <option value="all">All time</option>
+          <option value="week">Last 7 days</option>
+          <option value="month">Last 30 days</option>
+          <option value="year">Last 12 months</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Serial</th><th>Borrowed by</th><th>Date issued</th><th>Collection date</th><th>Date returned</th><th>Duration</th><th>Status</th></tr>
+          </thead>
+          <tbody id="history"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel page" data-page="schedule" style="margin-top:22px">
+      <div class="toolbar">
+        <h2>📅 Collection Schedule</h2>
+        <input id="collectionSearch" placeholder="Search by serial or person">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Collection date</th><th>Serial</th><th>Person</th><th>Days left</th><th>Status</th></tr>
+          </thead>
+          <tbody id="collectionTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel page" data-page="damage" style="margin-top:22px">
+      <div class="section-kicker">Maintenance desk</div><h2>Damage report</h2>
+      <form id="damageForm" style="max-width:620px;margin-bottom:28px">
+        <label for="damageSN">Device serial</label><select id="damageSN" required></select>
+        <label for="damageDesc">What's broken?</label><textarea id="damageDesc" required placeholder="Screen cracked, battery not working, keyboard broken..."></textarea>
+        <div class="actions"><button class="danger" type="submit">Mark as broken</button></div>
+      </form>
+      <div class="toolbar">
+        <input id="damageSearch" placeholder="Search by serial or damage type">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Serial</th><th>Issue</th><th>Reported on</th><th>Status</th><th>Action</th></tr>
+          </thead>
+          <tbody id="damageLog"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Return modal -->
+  <div id="returnModal" class="modal">
+    <div class="modal-content">
+      <h3>Record Return</h3>
+      <p id="returnDevice" style="margin:0;font-weight:700"></p>
+      <label for="returnDate">Date returned</label>
+      <input id="returnDate" type="date">
+      <div class="modal-actions">
+        <button class="primary" onclick="confirmReturn()">Record Return</button>
+        <button class="secondary" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Damage repair modal -->
+  <div id="repairModal" class="modal">
+    <div class="modal-content">
+      <h3>Mark as Repaired</h3>
+      <p id="repairDevice" style="margin:0;font-weight:700"></p>
+      <label for="repairDate">Date repaired</label>
+      <input id="repairDate" type="date">
+      <div class="modal-actions">
+        <button class="primary" onclick="confirmRepair()">Mark as Repaired</button>
+        <button class="secondary" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script>
+    // Wait for Supabase library to load
+    const waitForSupabase = () => {
+      return new Promise((resolve) => {
+        if (window.supabase) {
+          resolve();
+        } else {
+          const timer = setInterval(() => {
+            if (window.supabase) {
+              clearInterval(timer);
+              resolve();
+            }
+          }, 100);
+        }
+      });
+    };
+
+    waitForSupabase().then(() => {
+      // Supabase config
+      const SUPABASE_URL = "https://uwkadrpcjqcjylrovvbg.supabase.co";
+      const SUPABASE_KEY = "sb_publishable_UDxlY5gXiE9HWRzOGtnuVQ_MfXddBD3";
+      
+      const { createClient } = window.supabase;
+      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const devices = ["MP22S31T","MP22RW76","MP22RFF4","MP22SC88","MP22Q8ND","MP22RSYR","MP22S7TC","MP22SC4T","MP22RHSX","MP22RN8J","MP22RL13","MP22SCA8","MP22RW60","MP22S7M1","MP22SC9H","MP22RN5W","MP22RQPY"].map(serial => ({ model:"81MH-0037HA", serial }));
+    
+    let handovers = [];
+    let damages = [];
+    
+    const $ = id => document.getElementById(id);
+    const today = new Date().toISOString().slice(0,10);
+    let returnSerial = null, repairSerial = null;
+
+    function fromHandover(row) {
+      return { ...row, issueDate: row.issuedate ?? row.issueDate, collectionDate: row.collectiondate ?? row.collectionDate };
+    }
+
+    function fromDamage(row) {
+      return { ...row, reportedDate: row.reporteddate ?? row.reportedDate };
+    }
+
+    async function loadData() {
+      try {
+        $("syncStatus").textContent = "🔄 Loading data...";
+        
+        console.log("Attempting to load from Supabase...");
+        
+        const { data: h, error: hErr } = await supabase.from("handovers").select("*").order('id', { ascending: false });
+        const { data: d, error: dErr } = await supabase.from("damages").select("*").order('id', { ascending: false });
+        
+        console.log("Handovers response:", { data: h, error: hErr });
+        console.log("Damages response:", { data: d, error: dErr });
+        
+        if (hErr) {
+          console.error("Handovers error:", hErr);
+          throw hErr;
+        }
+        if (dErr) {
+          console.error("Damages error:", dErr);
+          throw dErr;
+        }
+        
+        handovers = (h || []).map(fromHandover).filter(r => r.borrower?.trim() && r.issueDate);
+        damages = (d || []).map(fromDamage);
+        
+        console.log("Loaded handovers:", handovers.length);
+        console.log("Loaded damages:", damages.length);
+        
+        $("syncStatus").textContent = `✓ Synced (${handovers.length} handovers, ${damages.length} damages)`;
+        render();
+      } catch (err) {
+        console.error("Load error:", err);
+        $("syncStatus").textContent = "⚠ Sync failed - check console";
+        toast("Error loading data: " + err.message);
+      }
+    }
+
+    async function addHandover(data) {
+      try {
+        const { error } = await supabase.from("handovers").insert([{
+          serial: data.serial,
+          borrower: data.borrower,
+          issuedate: data.issueDate,
+          collectiondate: data.collectionDate,
+          returned: data.returned
+        }]);
+        if (error) throw error;
+        await loadData();
+        toast(`${data.serial} issued to ${data.borrower}`);
+      } catch (err) {
+        console.error("Add error:", err);
+        toast("Error: " + err.message);
+      }
+    }
+
+    async function updateHandover(id, data) {
+      try {
+        const update = {};
+        if (data.returned !== undefined) update.returned = data.returned;
+        if (data.issueDate !== undefined) update.issuedate = data.issueDate;
+        if (data.collectionDate !== undefined) update.collectiondate = data.collectionDate;
+        const { error } = await supabase.from("handovers").update(update).eq("id", id);
+        if (error) throw error;
+        await loadData();
+      } catch (err) {
+        console.error("Update error:", err);
+        toast("Error: " + err.message);
+      }
+    }
+
+    async function addDamage(data) {
+      try {
+        const { error } = await supabase.from("damages").insert([{
+          serial: data.serial,
+          description: data.description,
+          reporteddate: data.reportedDate,
+          repaired: data.repaired
+        }]);
+        if (error) throw error;
+        await loadData();
+        toast(`${data.serial} marked as broken`);
+      } catch (err) {
+        console.error("Damage error:", err);
+        toast("Error: " + err.message);
+      }
+    }
+
+    async function updateDamage(id, data) {
+      try {
+        const update = {};
+        if (data.repaired !== undefined) update.repaired = data.repaired;
+        if (data.description !== undefined) update.description = data.description;
+        const { error } = await supabase.from("damages").update(update).eq("id", id);
+        if (error) throw error;
+        await loadData();
+      } catch (err) {
+        console.error("Repair error:", err);
+        toast("Error: " + err.message);
+      }
+    }
+
+    function fmt(value) { 
+      if (!value) return "—";
+      return new Date(value + "T00:00:00").toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"});
+    }
+    
+    function active(serial) { return handovers.find(r => r.serial === serial && !r.returned && r.borrower?.trim() && r.issueDate); }
+    function isBroken(serial) { return damages.find(d => d.serial === serial && !d.repaired); }
+    
+    function daysAgo(date) {
+      return Math.floor((new Date(today) - new Date(date)) / 86400000);
+    }
+    
+    function filterByDate(record) {
+      const filter = $("dateFilter").value;
+      const days = daysAgo(record.issueDate);
+      if (filter === "all") return true;
+      if (filter === "week") return days <= 7;
+      if (filter === "month") return days <= 30;
+      if (filter === "year") return days <= 365;
+      return true;
+    }
+
+    function render() {
+      const query = $("search").value.toLowerCase();
+      const logQuery = $("logSearch").value.toLowerCase();
+      const damageQuery = $("damageSearch").value.toLowerCase();
+      
+      const current = devices.map(d => ({
+        ...d,
+        handover: active(d.serial),
+        broken: isBroken(d.serial)
+      }));
+
+      // Stats
+      $("total").textContent = devices.length;
+      $("available").textContent = current.filter(d => !d.handover && !d.broken).length;
+      $("issued").textContent = current.filter(d => d.handover).length;
+      $("broken").textContent = current.filter(d => d.broken).length;
+      $("logs").textContent = handovers.length;
+
+      // Device dropdown
+      const select = $("device");
+      const selected = select.value;
+      select.innerHTML = '<option value="">Select a Chromebook...</option>' + 
+        current.filter(d => !d.handover && !d.broken)
+          .map(d => `<option value="${d.serial}">${d.serial} · ${d.model}</option>`)
+          .join("");
+      select.value = selected;
+
+      // Damage dropdown
+      const dmgSelect = $("damageSN");
+      const dmgSelected = dmgSelect.value;
+      dmgSelect.innerHTML = '<option value="">Select a Chromebook...</option>' +
+        current.filter(d => !d.broken)
+          .map(d => `<option value="${d.serial}">${d.serial}</option>`)
+          .join("");
+      dmgSelect.value = dmgSelected;
+
+      // Inventory table
+      $("inventory").innerHTML = current.filter(d => !query || `${d.serial} ${d.model} ${d.handover?.borrower || ""}`.toLowerCase().includes(query))
+        .map(d => {
+          let status = "Available";
+          let badgeClass = "available";
+          let issued = "—";
+          let collectionDate = "—";
+          let actions = "—";
+          
+          if (d.broken) {
+            status = "Broken";
+            badgeClass = "broken";
+            issued = d.broken.reportedDate ? fmt(d.broken.reportedDate) : "—";
+            actions = `<button class="danger" onclick="openRepairModal('${d.serial}')">Mark Repaired</button>`;
+          } else if (d.handover) {
+            status = "Issued";
+            badgeClass = "issued";
+            issued = fmt(d.handover.issueDate);
+            collectionDate = fmt(d.handover.collectionDate);
+            actions = `<button class="danger" onclick="openReturnModal('${d.serial}')">Record Return</button>`;
+          }
+          
+          return `<tr>
+            <td class="serial">${d.serial}</td>
+            <td class="model">${d.model}</td>
+            <td><span class="badge ${badgeClass}">${status}</span></td>
+            <td>${d.handover?.borrower || d.broken?.description || "—"}</td>
+            <td>${issued}</td>
+            <td>${collectionDate}</td>
+            <td>${actions}</td>
+          </tr>`;
+        }).join("") || '<tr><td colspan="7" class="empty">No matching devices.</td></tr>';
+
+      // Handover log
+      $("history").innerHTML = handovers.filter(filterByDate)
+        .filter(r => !logQuery || `${r.serial} ${r.borrower} ${r.issueDate} ${r.returned || ""}`.toLowerCase().includes(logQuery))
+        .reverse()
+        .map(r => {
+          const duration = r.returned ? Math.max(0, Math.round((new Date(r.returned) - new Date(r.issueDate)) / 86400000)) + " days" : '<span class="badge issued">Open</span>';
+          return `<tr>
+            <td class="serial">${r.serial}</td>
+            <td>${r.borrower}</td>
+            <td>${fmt(r.issueDate)}</td>
+            <td>${fmt(r.collectionDate)}</td>
+            <td>${fmt(r.returned)}</td>
+            <td>${duration}</td>
+            <td>${r.returned ? '<span class="badge available">Returned</span>' : '<span class="badge issued">Active</span>'}</td>
+          </tr>`;
+        }).join("") || '<tr><td colspan="7" class="empty">No handovers in this period.</td></tr>';
+
+      // Collection schedule
+      const collectionQuery = $("collectionSearch").value.toLowerCase();
+      $("collectionTable").innerHTML = handovers
+        .filter(r => !r.returned && r.collectionDate)
+        .filter(r => !collectionQuery || `${r.serial} ${r.borrower}`.toLowerCase().includes(collectionQuery))
+        .sort((a, b) => new Date(a.collectionDate) - new Date(b.collectionDate))
+        .map(r => {
+          const daysLeft = Math.ceil((new Date(r.collectionDate) - new Date(today)) / 86400000);
+          let status = '<span class="badge available">On time</span>';
+          if (daysLeft < 0) {
+            status = '<span class="badge broken">OVERDUE</span>';
+          } else if (daysLeft <= 3) {
+            status = '<span class="badge issued">Due soon</span>';
+          }
+          
+          return `<tr>
+            <td><strong>${fmt(r.collectionDate)}</strong></td>
+            <td class="serial">${r.serial}</td>
+            <td>${r.borrower}</td>
+            <td>${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}</td>
+            <td>${status}</td>
+          </tr>`;
+        }).join("") || '<tr><td colspan="5" class="empty">No active handovers.</td></tr>';
+
+      // Damage log
+      $("damageLog").innerHTML = damages.filter(d => !damageQuery || `${d.serial} ${d.description}`.toLowerCase().includes(damageQuery))
+        .map(d => {
+          const status = d.repaired ? `Repaired ${fmt(d.repaired)}` : '<span class="badge broken">Pending</span>';
+          const action = d.repaired ? "—" : `<button class="danger" onclick="openRepairModal('${d.serial}')">Mark Repaired</button>`;
+          return `<tr>
+            <td class="serial">${d.serial}</td>
+            <td>${d.description}</td>
+            <td>${fmt(d.reportedDate)}</td>
+            <td>${status}</td>
+            <td>${action}</td>
+          </tr>`;
+        }).join("") || '<tr><td colspan="5" class="empty">No damage reports.</td></tr>';
+    }
+
+    function toast(message) {
+      $("toast").textContent = message;
+      $("toast").classList.remove("hidden");
+      setTimeout(() => $("toast").classList.add("hidden"), 2500);
+    }
+
+    function showPage(page) {
+      document.querySelectorAll(".page").forEach(section => section.classList.toggle("active", section.dataset.page === page));
+      document.querySelectorAll(".nav-link").forEach(button => button.classList.toggle("active", button.dataset.page === page));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    document.querySelectorAll(".nav-link").forEach(button => button.addEventListener("click", () => showPage(button.dataset.page)));
+    document.querySelectorAll("[data-go]").forEach(button => button.addEventListener("click", () => showPage(button.dataset.go)));
+
+    function openReturnModal(serial) {
+      returnSerial = serial;
+      $("returnDevice").textContent = serial;
+      $("returnDate").value = today;
+      $("returnModal").classList.add("active");
+    }
+
+    async function confirmReturn() {
+      if (!returnSerial) return;
+      const record = active(returnSerial);
+      if (!record) return;
+      await updateHandover(record.id, { returned: $("returnDate").value });
+      closeModal();
+    }
+
+    function openRepairModal(serial) {
+      repairSerial = serial;
+      $("repairDevice").textContent = serial;
+      $("repairDate").value = today;
+      $("repairModal").classList.add("active");
+    }
+
+    async function confirmRepair() {
+      if (!repairSerial) return;
+      const damage = damages.find(d => d.serial === repairSerial && !d.repaired);
+      if (damage) {
+        await updateDamage(damage.id, { repaired: $("repairDate").value });
+      }
+      closeModal();
+    }
+
+    function closeModal() {
+      $("returnModal").classList.remove("active");
+      $("repairModal").classList.remove("active");
+      returnSerial = null;
+      repairSerial = null;
+    }
+
+    $("issueDate").value = today;
+    const defaultCollection = new Date(new Date(today).getTime() + 14 * 86400000);
+    $("collectionDate").value = defaultCollection.toISOString().slice(0, 10);
+
+    $("issueForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const serial = $("device").value;
+      if (!serial) return;
+      if (active(serial)) {
+        toast(`${serial} is already issued.`);
+        return;
+      }
+      const submitButton = e.target.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      
+      await addHandover({
+        serial,
+        borrower: $("borrower").value.trim(),
+        issueDate: $("issueDate").value,
+        collectionDate: $("collectionDate").value,
+        returned: null
+      });
+      
+      e.target.reset();
+      $("issueDate").value = today;
+      const dc = new Date(new Date(today).getTime() + 14 * 86400000);
+      $("collectionDate").value = dc.toISOString().slice(0, 10);
+      submitButton.disabled = false;
+    });
+
+    $("damageForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const serial = $("damageSN").value;
+      if (!serial) return;
+      
+      await addDamage({
+        serial,
+        description: $("damageDesc").value.trim(),
+        reportedDate: today,
+        repaired: null
+      });
+      
+      e.target.reset();
+    });
+    ["search", "logSearch", "damageSearch", "collectionSearch", "dateFilter"].forEach(id => 
+      $(id).addEventListener("input", render)
+    );
+    $("dateFilter").addEventListener("change", render);
+
+    $("export").addEventListener("click", () => {
+      const rows = [
+        ["Model", "Serial", "Issued To", "Date Issued", "Collection Date", "Date Returned", "Duration", "Status", "Damage"],
+        ...devices.map(d => {
+          const handover = active(d.serial) || handovers.slice().reverse().find(x => x.serial === d.serial);
+          const damage = isBroken(d.serial) || damages.slice().reverse().find(x => x.serial === d.serial);
+          const duration = handover && handover.returned 
+            ? Math.max(0, Math.round((new Date(handover.returned) - new Date(handover.issueDate)) / 86400000)) + " days"
+            : "";
+          const status = damage && !damage.repaired ? "Broken" : handover && !handover.returned ? "Issued" : "Available";
+          
+          return [
+            d.model,
+            d.serial,
+            handover?.borrower || "",
+            handover?.issueDate || "",
+            handover?.collectionDate || "",
+            handover?.returned || "",
+            duration,
+            status,
+            damage?.description || ""
+          ];
+        })
+      ];
+      
+      const csv = rows.map(row => row.map(v => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\n");
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([csv], {type: "text/csv"}));
+      link.download = `chromebook-log-${today}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast("CSV export downloaded.");
+    });
+
+    // Test Supabase connection first
+    async function testConnection() {
+      try {
+        const { error } = await supabase.from("handovers").select("id").limit(1);
+        if (error) {
+          console.error("Connection failed:", error);
+          $("syncStatus").textContent = "⚠ Cannot connect to database";
+          return false;
+        }
+        console.log("Connected to Supabase successfully");
+        return true;
+      } catch (err) {
+        console.error("Connection error:", err);
+        return false;
+      }
+    }
+
+    testConnection().then(connected => {
+      if (connected) loadData();
+    });
+    });
+  </script>
+</body>
+</html>
