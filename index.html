@@ -229,7 +229,13 @@
       const SUPABASE_KEY = "sb_publishable_UDxlY5gXiE9HWRzOGtnuVQ_MfXddBD3";
       
       const { createClient } = window.supabase;
-      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
+      });
 
     const devices = ["MP22S31T","MP22RW76","MP22RFF4","MP22SC88","MP22Q8ND","MP22RSYR","MP22S7TC","MP22SC4T","MP22RHSX","MP22RN8J","MP22RL13","MP22SCA8","MP22RW60","MP22S7M1","MP22SC9H","MP22RN5W","MP22RQPY"].map(serial => ({ model:"81MH-0037HA", serial }));
     
