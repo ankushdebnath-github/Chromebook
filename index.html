@@ -13,7 +13,7 @@
     .header-mark { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:#8ed5c2; white-space:nowrap; }
     main { max-width:1280px; margin:0 auto; padding:28px 24px 60px; } .stats { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:24px; }
     .stat, .panel { background:var(--panel); border:1px solid var(--line); box-shadow:var(--shadow); } .stat { padding:18px 20px; border-top:4px solid var(--teal); } .stat span { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; } .stat strong { display:block; margin-top:7px; font:700 29px Georgia,serif; }
-    .stat.broken { border-top-color:var(--red); } .stat.broken strong { color:var(--red); }
+    .stat.broken { border-top-color:var(--red); } .stat.broken strong { color:var(--red); } .stat.missing { border-top-color:#bd7a20; } .stat.missing strong { color:#a56617; }
     .layout { display:grid; grid-template-columns:380px 1fr; gap:22px; align-items:start; } .panel { padding:22px; } h2 { margin:0 0 18px; font:700 22px Georgia,serif; } h3 { margin:0 0 12px; font-size:16px; }
     label { display:block; margin:13px 0 6px; color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; } input, select, textarea { width:100%; border:1px solid #cbd3d0; background:#fff; color:var(--ink); padding:11px 12px; border-radius:4px; font:inherit; } input:focus, select:focus, textarea:focus { outline:2px solid #8ed5c2; border-color:var(--teal); }
     textarea { resize:vertical; min-height:70px; } button { border:0; border-radius:4px; padding:11px 15px; font:700 14px inherit; cursor:pointer; } button.primary { background:var(--teal); color:#fff; } button.primary:hover { background:var(--teal-dark); } button.secondary { background:#e9efeb; color:var(--teal-dark); } button.danger { color:var(--red); background:#fbe9e5; } .actions { display:flex; gap:9px; margin-top:18px; } .actions button { flex:1; }
@@ -48,6 +48,7 @@
     <button class="nav-link" data-page="handovers">↗ Handovers</button>
     <button class="nav-link" data-page="schedule">◷ Collection schedule</button>
     <button class="nav-link" data-page="damage">⚠ Damage</button>
+    <button class="nav-link" data-page="missing">⌕ Missing</button>
     <button class="nav-link" data-page="logs">▤ Handover logs</button>
   </nav>
   <main>
@@ -61,6 +62,7 @@
       <div class="stat"><span>Available</span><strong id="available">17</strong></div>
       <div class="stat"><span>Currently issued</span><strong id="issued">0</strong></div>
       <div class="stat broken"><span>Broken/Damaged</span><strong id="broken">0</strong></div>
+      <div class="stat missing"><span>Missing</span><strong id="missing">0</strong></div>
       <div class="stat"><span>Total handovers</span><strong id="logs">0</strong></div>
     </section>
     <div class="layout">
@@ -159,6 +161,18 @@
           <tbody id="damageLog"></tbody>
         </table>
       </div>
+    </section>
+
+    <section class="panel page" data-page="missing" style="margin-top:22px">
+      <div class="section-kicker">Loss register</div><h2>Missing Chromebook</h2>
+      <div class="hint">Record a device that cannot be located. Add the last known details so the team can follow up.</div>
+      <form id="missingForm" style="max-width:620px;margin-bottom:28px">
+        <label for="missingSN">Device serial</label><select id="missingSN" required></select>
+        <label for="missingDesc">Details</label><textarea id="missingDesc" required placeholder="Last seen location, date, or other useful details..."></textarea>
+        <div class="actions"><button class="danger" type="submit">Mark as missing</button></div>
+      </form>
+      <div class="toolbar"><input id="missingSearch" placeholder="Search missing devices"></div>
+      <div class="table-wrap"><table><thead><tr><th>Serial</th><th>Details</th><th>Reported on</th><th>Status</th><th>Action</th></tr></thead><tbody id="missingLog"></tbody></table></div>
     </section>
   </main>
 
@@ -340,7 +354,9 @@
     }
     
     function active(serial) { return handovers.find(r => r.serial === serial && !r.returned && r.borrower?.trim() && r.issueDate); }
-    function isBroken(serial) { return damages.find(d => d.serial === serial && !d.repaired); }
+    function isMissing(serial) { return damages.find(d => d.serial === serial && !d.repaired && d.description?.startsWith("MISSING:")); }
+    function isBroken(serial) { return damages.find(d => d.serial === serial && !d.repaired && !d.description?.startsWith("MISSING:")); }
+    function isPermanent(record) { return record?.borrower?.trim().toLowerCase() === "thane"; }
     
     function daysAgo(date) {
       return Math.floor((new Date(today) - new Date(date)) / 86400000);
@@ -364,7 +380,8 @@
       const current = devices.map(d => ({
         ...d,
         handover: active(d.serial),
-        broken: isBroken(d.serial)
+        broken: isBroken(d.serial),
+        missing: isMissing(d.serial)
       }));
 
       // Stats
@@ -372,13 +389,14 @@
       $("available").textContent = current.filter(d => !d.handover && !d.broken).length;
       $("issued").textContent = current.filter(d => d.handover).length;
       $("broken").textContent = current.filter(d => d.broken).length;
+      $("missing").textContent = current.filter(d => d.missing).length;
       $("logs").textContent = handovers.length;
 
       // Device dropdown
       const select = $("device");
       const selected = select.value;
       select.innerHTML = '<option value="">Select a Chromebook...</option>' + 
-        current.filter(d => !d.handover && !d.broken)
+        current.filter(d => !d.handover && !d.broken && !d.missing)
           .map(d => `<option value="${d.serial}">${d.serial} · ${d.model}</option>`)
           .join("");
       select.value = selected;
@@ -387,10 +405,18 @@
       const dmgSelect = $("damageSN");
       const dmgSelected = dmgSelect.value;
       dmgSelect.innerHTML = '<option value="">Select a Chromebook...</option>' +
-        current.filter(d => !d.broken)
+        current.filter(d => !d.broken && !d.missing)
           .map(d => `<option value="${d.serial}">${d.serial}</option>`)
           .join("");
       dmgSelect.value = dmgSelected;
+
+      const missingSelect = $("missingSN");
+      const missingSelected = missingSelect.value;
+      missingSelect.innerHTML = '<option value="">Select a Chromebook...</option>' +
+        current.filter(d => !d.missing)
+          .map(d => `<option value="${d.serial}">${d.serial}</option>`)
+          .join("");
+      missingSelect.value = missingSelected;
 
       // Inventory table
       $("inventory").innerHTML = current.filter(d => !query || `${d.serial} ${d.model} ${d.handover?.borrower || ""}`.toLowerCase().includes(query))
@@ -401,17 +427,21 @@
           let collectionDate = "—";
           let actions = "—";
           
-          if (d.broken) {
+          if (d.missing) {
+            status = "Missing";
+            badgeClass = "broken";
+            issued = d.missing.reportedDate ? fmt(d.missing.reportedDate) : "—";
+          } else if (d.broken) {
             status = "Broken";
             badgeClass = "broken";
             issued = d.broken.reportedDate ? fmt(d.broken.reportedDate) : "—";
             actions = `<button class="danger" onclick="openRepairModal('${d.serial}')">Mark Repaired</button>`;
           } else if (d.handover) {
-            status = "Issued";
+            status = isPermanent(d.handover) ? "Permanent" : "Issued";
             badgeClass = "issued";
             issued = fmt(d.handover.issueDate);
             collectionDate = fmt(d.handover.collectionDate);
-            actions = `<button class="danger" onclick="openReturnModal('${d.serial}')">Record Return</button>`;
+            actions = isPermanent(d.handover) ? "Assigned to Thane" : `<button class="danger" onclick="openReturnModal('${d.serial}')">Record Return</button>`;
           }
           
           return `<tr>
@@ -438,14 +468,14 @@
             <td>${fmt(r.collectionDate)}</td>
             <td>${fmt(r.returned)}</td>
             <td>${duration}</td>
-            <td>${r.returned ? '<span class="badge available">Returned</span>' : '<span class="badge issued">Active</span>'}</td>
+            <td>${r.returned ? '<span class="badge available">Returned</span>' : isPermanent(r) ? '<span class="badge issued">Permanent</span>' : '<span class="badge issued">Active</span>'}</td>
           </tr>`;
         }).join("") || '<tr><td colspan="7" class="empty">No handovers in this period.</td></tr>';
 
       // Collection schedule
       const collectionQuery = $("collectionSearch").value.toLowerCase();
       $("collectionTable").innerHTML = handovers
-        .filter(r => !r.returned && r.collectionDate)
+        .filter(r => !r.returned && r.collectionDate && !isPermanent(r))
         .filter(r => !collectionQuery || `${r.serial} ${r.borrower}`.toLowerCase().includes(collectionQuery))
         .sort((a, b) => new Date(a.collectionDate) - new Date(b.collectionDate))
         .map(r => {
@@ -467,7 +497,8 @@
         }).join("") || '<tr><td colspan="5" class="empty">No active handovers.</td></tr>';
 
       // Damage log
-      $("damageLog").innerHTML = damages.filter(d => !damageQuery || `${d.serial} ${d.description}`.toLowerCase().includes(damageQuery))
+      $("damageLog").innerHTML = damages.filter(d => !d.description?.startsWith("MISSING:"))
+        .filter(d => !damageQuery || `${d.serial} ${d.description}`.toLowerCase().includes(damageQuery))
         .map(d => {
           const status = d.repaired ? `Repaired ${fmt(d.repaired)}` : '<span class="badge broken">Pending</span>';
           const action = d.repaired ? "—" : `<button class="danger" onclick="openRepairModal('${d.serial}')">Mark Repaired</button>`;
@@ -479,6 +510,12 @@
             <td>${action}</td>
           </tr>`;
         }).join("") || '<tr><td colspan="5" class="empty">No damage reports.</td></tr>';
+
+      const missingQuery = $("missingSearch").value.toLowerCase();
+      $("missingLog").innerHTML = damages.filter(d => d.description?.startsWith("MISSING:"))
+        .filter(d => !missingQuery || `${d.serial} ${d.description}`.toLowerCase().includes(missingQuery))
+        .map(d => `<tr><td class="serial">${d.serial}</td><td>${d.description.replace(/^MISSING:\s*/, "")}</td><td>${fmt(d.reportedDate)}</td><td>${d.repaired ? `<span class="badge available">Found ${fmt(d.repaired)}</span>` : '<span class="badge broken">Missing</span>'}</td><td>${d.repaired ? "—" : `<button class="secondary" onclick="openRepairModal('${d.serial}')">Mark found</button>`}</td></tr>`)
+        .join("") || '<tr><td colspan="5" class="empty">No missing devices recorded.</td></tr>';
     }
 
     function toast(message) {
@@ -584,7 +621,20 @@
       
       e.target.reset();
     });
-    ["search", "logSearch", "damageSearch", "collectionSearch", "dateFilter"].forEach(id => 
+    $("missingForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const serial = $("missingSN").value;
+      if (!serial) return;
+      await addDamage({
+        serial,
+        description: `MISSING: ${$("missingDesc").value.trim()}`,
+        reportedDate: today,
+        repaired: null
+      });
+      e.target.reset();
+    });
+
+    ["search", "logSearch", "damageSearch", "collectionSearch", "missingSearch", "dateFilter"].forEach(id => 
       $(id).addEventListener("input", render)
     );
     $("dateFilter").addEventListener("change", render);
