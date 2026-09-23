@@ -534,6 +534,12 @@
       repairSerial = null;
     }
 
+    window.openReturnModal = openReturnModal;
+    window.confirmReturn = confirmReturn;
+    window.openRepairModal = openRepairModal;
+    window.confirmRepair = confirmRepair;
+    window.closeModal = closeModal;
+
     $("issueDate").value = today;
     const defaultCollection = new Date(new Date(today).getTime() + 14 * 86400000);
     $("collectionDate").value = defaultCollection.toISOString().slice(0, 10);
